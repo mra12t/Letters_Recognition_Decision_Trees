@@ -1,0 +1,157 @@
+---
+title: "Letter Recognition"
+output: github_document
+date: "2022-12-20"
+---
+### About the Study and the Data Set
+The letters_ABPR.csv file contains data for 3116 images of the letters A, B, P, and R, which were produced by distorting 20 different fonts. Each image is represented as a collection of pixels that are either "on" or "off", and the data includes statistics about the images as well as the corresponding letter for each image. This data was obtained from the UCI Machine Learning Repository.  
+The dataset described contains 17 variables, including the letter represented in the image (A, B, P, or R), the position and size of the smallest bounding box enclosing the letter, various statistical measures of the distribution of "on" pixels in the image (e.g. mean position, mean squared position, mean of product of position and squared position), and measures of the number of edges in the image when scanned horizontally or vertically.   
+
+### EDA
+```{r}
+lettersd = read.csv("letters_ABPR.csv")
+str(lettersd)
+```
+Let's start by trying to predict whether a letter is B or not B and then we can move on to predecting between the different letters. 
+
+So we will add a variable that gives True when the letter is B to the dataset
+```{r}
+lettersd$isB = as.factor(lettersd$letter == "B")
+```
+
+Now, let's split the data set and establish a base line model. we will set the seeds to an arbitrary number so that the results are reproducable.  
+```{r}
+library(caTools)
+set.seed(123)
+spl = sample.split(lettersd$isB, SplitRatio = 0.5)
+train = subset(lettersd, spl == TRUE)
+test = subset(lettersd, spl == FALSE)
+
+```
+
+```{r}
+library(knitr)
+kable(table(test$isB))
+```
+
+
+We can see that a base line model that predict the most likely outcome on the Test set (Not B), will have an accuracy of $(1175)/(1175 + 383)= 0.75$. 
+
+### Building a Classification Tree
+```{r}
+library(rpart)
+library(rpart.plot)
+CARTb = rpart(isB ~ . -letter, data = train, method = "class")
+prp(CARTb)
+```
+
+
+So the tree is quite a complicated one, let's see the numerical values.
+
+```{r}
+predb = predict(CARTb, newdata = test, type = "class")
+kable(table(test$isB, predb))
+```
+
+
+Let's see the accuracy of the model. 
+```{r}
+x = table(test$isB, predb)
+(x[1] + x[4])/ sum(x)
+```
+The accuracy is 94%. 
+
+### Building a Random Forest
+
+```{r}
+library(randomForest)
+set.seed(123)
+RFb = randomForest(isB ~ .-letter, data = train)
+importance(RFb)
+```
+```{r}
+predRFb = predict(RFb, newdata = test)
+kable(table(test$isB, predRFb))
+```
+
+
+
+Let's calculate the accuracy of the random forest. 
+
+```{r}
+x = table(test$isB, predRFb)
+(x[1]+x[4])/sum(x)
+```
+
+The increase of the accuracy of the random forest model compared to the CART model seems significant. The down side , however, is the interpretability of the model.  
+
+Now Let's build a model to predict what is the letter. 
+
+### Predicting A, B, R, and B. 
+
+```{r}
+lettersd$letter = as.factor(lettersd$letter)
+set.seed(123)
+spl = sample.split(lettersd$letter, SplitRatio = 0.5)
+train1 = subset(lettersd, spl == TRUE)
+test1 = subset(lettersd, spl == FALSE)
+
+```
+
+Let's see the accuracy of a base line model. 
+
+```{r}
+x = table(test1$letter)
+kable(x)
+```
+
+A base line model on the test set would predict the most occuring variable all the time, in this case it is P and the accuracy is. 
+```{r}
+401/nrow(test1)
+```
+25.7%. 
+
+### Building a Classification Tree
+```{r}
+set.seed(123)
+CARTmodel = rpart(letter ~ . -isB, data = train1, method = "class")
+prp(CARTmodel)
+```
+
+
+We can see that the tree is quite interpretable. 
+
+```{r}
+predl = predict(CARTmodel, newdata = test1, type = "class")
+x = table(test1$letter, predl)
+kable(x)
+```
+```{r}
+#Accuracy
+sum(diag(x))/ sum(x)
+```
+
+We can see that the CART Model correctly predict the letter 88% of the times. 
+
+### Building a Random Forest Model
+```{r}
+set.seed(123)
+RFM = randomForest(letter ~ .-isB, data = train1)
+```
+
+```{r}
+predRFM = predict(RFM, newdata = test1)
+x = table(test1$letter, predRFM)
+kable(x)
+```
+
+Let's see the accuracy of the model. 
+
+```{r}
+#Accuracy 
+sum(diag(x))/sum(x)
+```
+
+We can see that the random forest model have an accuracy of ***98.7%***.
+
+
